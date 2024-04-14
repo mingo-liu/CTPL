@@ -4,7 +4,7 @@
 
 
 
-void first(int id) {
+void first(int id) {    // id: 线程id
     std::cout << "hello from " << id << ", function\n";
 }
 
@@ -30,10 +30,10 @@ void ugu(int id, Third & t) {
 }
 
 int main(int argc, char **argv) {
-    ctpl::thread_pool p(2 /* two threads in the pool */);
+    ctpl::thread_pool p(2 /* two threads in the pool */);     // 默认队列大小为：_ctplThreadPoolLength_ == 100
 
     std::future<void> qw = p.push(std::ref(first));  // function
-    p.push(first);  // function
+    p.push(first);  // function; 只传递了first，并未传递first的第一个参数id
     p.push(aga, 7);  // function
 
     {
@@ -53,7 +53,7 @@ int main(int argc, char **argv) {
         std::this_thread::sleep_for(std::chrono::milliseconds(2000));
         p.push(const_cast<const Second &>(second));  // functor, copy ctor
         p.push(std::move(second));  // functor, move ctor
-        p.push(second);  // functor, move ctor
+        p.push(second);  // functor, move ctor? ---> copy ctor
         p.push(Second(", functor"));  // functor, move ctor
     }
         {
@@ -64,7 +64,7 @@ int main(int argc, char **argv) {
             p.push(ugu, std::move(t));  // function. move ctor, move ctor
 
         }
-        p.push(ugu, Third(200));  // function
+        p.push(ugu, Third(200));  // function, move ctor
 
 
 

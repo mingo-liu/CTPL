@@ -87,7 +87,7 @@ namespace ctpl {
                     {
                         // stop the detached threads that were waiting
                         std::unique_lock<std::mutex> lock(this->mutex);
-                        this->cv.notify_all();
+                        this->cv.notify_all();    // 通知等待队列中的线程
                     }
                     this->threads.resize(nThreads);  // safe to delete because the threads are detached
                     this->flags.resize(nThreads);  // safe to delete because the threads have copies of shared_ptr of the flags, not originals
@@ -154,7 +154,7 @@ namespace ctpl {
             auto pck = std::make_shared<std::packaged_task<decltype(f(0, rest...))(int)>>(
                 std::bind(std::forward<F>(f), std::placeholders::_1, std::forward<Rest>(rest)...)  // std::placeholders::_1: 占位符,表示第一个参数，将其绑定到f的第一个参数位置
             );    // packaged_task 将一个bind创建的可调用对象与一个future相关联
-
+                  // pck是一个可调用的对象，第一个参数是std::placeholders::_1, 其余的参数是std::forward<Rest>(rest)...
             auto _f = new std::function<void(int id)>([pck](int id) {
                 (*pck)(id);
             });     // 创建一个指针_f指向一个lambda表达式
@@ -194,11 +194,11 @@ namespace ctpl {
 
         void set_thread(int i) {
             std::shared_ptr<std::atomic<bool>> flag(this->flags[i]);  // a copy of the shared ptr to the flag
-            auto f = [this, i, flag/* a copy of the shared ptr to the flag */]() {
+            auto f = [this, i, flag/* a copy of the shared ptr to the flag */]() {  // 定义一个lambda对象f，并将其与线程关联
                 std::atomic<bool> & _flag = *flag;
                 std::function<void(int id)> * _f;
-                bool isPop = this->q.pop(_f);
-                while (true) {
+                bool isPop = this->q.pop(_f);       // 从队列q里取出一个任务
+                while (true) {    // 每一个线程都在不断地从队列中取任务
                     while (isPop) {  // if there is anything in the queue, 队列不空
                         std::unique_ptr<std::function<void(int id)>> func(_f);  // at return, delete the function even if an exception occurred
                         (*_f)(i);
@@ -225,11 +225,11 @@ namespace ctpl {
         void init() { this->nWaiting = 0; this->isStop = false; this->isDone = false; }
 
         std::vector<std::unique_ptr<std::thread>> threads;
-        std::vector<std::shared_ptr<std::atomic<bool>>> flags;
+        std::vector<std::shared_ptr<std::atomic<bool>>> flags;      // 标记线程是否完成, 新创建线程：false；完成的线程：true;
         mutable boost::lockfree::queue<std::function<void(int id)> *> q;
-        std::atomic<bool> isDone;
-        std::atomic<bool> isStop;
-        std::atomic<int> nWaiting;  // how many threads are waiting
+        std::atomic<bool> isDone;   // true: 让等待中的线程完成
+        std::atomic<bool> isStop;   // true: 等待运行中线程完成，然后停止所有线程 
+        std::atomic<int> nWaiting;  // how many threads are waiting, 等待队列中出现任务
 
         std::mutex mutex;
         std::condition_variable cv;
